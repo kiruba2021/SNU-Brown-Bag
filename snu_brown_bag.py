@@ -18,7 +18,7 @@ def init_db():
                   head_email TEXT, coord_email TEXT, password TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS presentations 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, presenter TEXT, designation TEXT, 
-                  guide_name TEXT, title TEXT, abstract TEXT, date TEXT, time TEXT, 
+                  guide_name TEXT, meeting_link TEXT, title TEXT, abstract TEXT, date TEXT, time TEXT, 
                   duration TEXT, venue_hall TEXT, dept_id INTEGER)''')
     c.execute('''CREATE TABLE IF NOT EXISTS subscriptions 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE)''')
@@ -135,7 +135,7 @@ with tabs[2]:
         c_mode = st.radio("Mode", ["Add New", "Manage Presentations"], horizontal=True)
         if c_mode == "Add New":
             with st.form("add_form"):
-                pn, pr, pg = st.text_input("Presenter"), st.selectbox("Role", ["Faculty", "Scholar", "Student"]), st.text_input("Guide Name"), st.text_input("Meeting Link")
+                pn, pr, pg, pmlink = st.text_input("Presenter"), st.selectbox("Role", ["Faculty", "Scholar", "Student"]), st.text_input("Guide Name"), st.text_input("Meeting Link")
                 pt, pa = st.text_input("Title"), st.text_area("Abstract")
                 c1, c2, c3, c4 = st.columns(4)
                 pdte, ptime = c1.date_input("Date"), c2.selectbox("Time", TIME_SLOTS)
@@ -222,6 +222,7 @@ with tabs[3]:
                     res = send_mail("Research Schedule Update", body, list_re, sem, spa)
                     if res == True: st.success("Broadcast successful!")
                     else: st.error(res)
+
 
 
 
