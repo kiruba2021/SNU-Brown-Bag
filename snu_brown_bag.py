@@ -135,7 +135,7 @@ with tabs[2]:
         c_mode = st.radio("Mode", ["Add New", "Manage Presentations"], horizontal=True)
         if c_mode == "Add New":
             with st.form("add_form"):
-                pn, pr, pg = st.text_input("Presenter"), st.selectbox("Role", ["Faculty", "Scholar", "Student"]), st.text_input("Guide Name")
+                pn, pr, pg = st.text_input("Presenter"), st.selectbox("Role", ["Faculty", "Scholar", "Student"]), st.text_input("Guide Name"), st.text_input("Meeting Link")
                 pt, pa = st.text_input("Title"), st.text_area("Abstract")
                 c1, c2, c3, c4 = st.columns(4)
                 pdte, ptime = c1.date_input("Date"), c2.selectbox("Time", TIME_SLOTS)
@@ -210,7 +210,7 @@ with tabs[3]:
             
             body = "SNU Research Presentation Schedule:\n\n"
             for _, r in df.iterrows():
-                body += f"🔹 {r['title']}\n🗓️ {r['date']} | 🕒 {r['time']}\n👤 {r['presenter']} (Guide: {r['guide_name']})\n📍 {r['venue_hall']}\n\n"
+                body += f"🔹 {r['title']}\n🗓️ {r['date']} | 🕒 {r['time']}\n👤 {r['presenter']} (Guide: {r['guide_name']})\n {r['Meeting Link']} 📍 {r['venue_hall']}\n\n"
             
             if st.button("🚀 Send Emails"):
                 with st.spinner("⏳ Broadcasting..."):
@@ -222,3 +222,4 @@ with tabs[3]:
                     res = send_mail("Research Schedule Update", body, list_re, sem, spa)
                     if res == True: st.success("Broadcast successful!")
                     else: st.error(res)
+
