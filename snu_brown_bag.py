@@ -145,7 +145,7 @@ with tabs[2]:
                         conn = sqlite3.connect('ssn_research.db')
                         did = conn.execute("SELECT id FROM departments WHERE name=?", (st.session_state['dept'],)).fetchone()[0]
                         conn.execute("INSERT INTO presentations (presenter,designation,guide_name, meeting_link, title,abstract,date,time,duration,venue_hall,dept_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                                     (pn,pr,pg,pt,pa,str(pdte),ptime,pdur,phall,did))
+                                     (pn,pr,pg,pmlink,pt,pa,str(pdte),ptime,pdur,phall,did))
                         conn.commit(); conn.close(); delayed_refresh("Scheduled!")
 
 # --- TAB 4: ADMIN CONTROL ---
@@ -222,5 +222,6 @@ with tabs[3]:
                     res = send_mail("Research Schedule Update", body, list_re, sem, spa)
                     if res == True: st.success("Broadcast successful!")
                     else: st.error(res)
+
 
 
