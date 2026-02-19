@@ -18,7 +18,7 @@ def init_db():
                   head_email TEXT, coord_email TEXT, password TEXT)''')
     c.execute('''CREATE TABLE IF NOT EXISTS presentations 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, presenter TEXT, designation TEXT, 
-                  guide_name TEXT, meeting_link TEXT, title TEXT, abstract TEXT, date TEXT, time TEXT, 
+                  guide_name TEXT, title TEXT, abstract TEXT, date TEXT, time TEXT, 
                   duration TEXT, venue_hall TEXT, dept_id INTEGER)''')
     c.execute('''CREATE TABLE IF NOT EXISTS subscriptions 
                  (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT UNIQUE)''')
@@ -135,17 +135,17 @@ with tabs[2]:
         c_mode = st.radio("Mode", ["Add New", "Manage Presentations"], horizontal=True)
         if c_mode == "Add New":
             with st.form("add_form"):
-                pn, pr, pg, pmlink = st.text_input("Presenter"), st.selectbox("Role", ["Faculty", "Scholar", "Student"]), st.text_input("Guide Name"), st.text_input("Meeting Link")
+                pn, pr, pg = st.text_input("Presenter"), st.selectbox("Role", ["Faculty", "Scholar", "Student"]), st.text_input("Guide Name")
                 pt, pa = st.text_input("Title"), st.text_area("Abstract")
                 c1, c2, c3, c4 = st.columns(4)
                 pdte, ptime = c1.date_input("Date"), c2.selectbox("Time", TIME_SLOTS)
-                pdur, phall = c3.selectbox("Duration", DURATIONS), c4.text_input("Hall")
+                pdur, phall = c3.selectbox("Duration", DURATIONS), c4.text_input("Hall/Meeting Link")
                 if st.form_submit_button("Submit"):
                     with st.spinner("⏳ Saving..."):
                         conn = sqlite3.connect('ssn_research.db')
                         did = conn.execute("SELECT id FROM departments WHERE name=?", (st.session_state['dept'],)).fetchone()[0]
-                        conn.execute("INSERT INTO presentations (presenter,designation,guide_name, meeting_link, title,abstract,date,time,duration,venue_hall,dept_id) VALUES (?,?,?,?,?,?,?,?,?,?,?)",
-                                     (pn,pr,pg,pmlink,pt,pa,str(pdte),ptime,pdur,phall,did))
+                        conn.execute("INSERT INTO presentations (presenter,designation,guide_name,title,abstract,date,time,duration,venue_hall,dept_id) VALUES (?,?,?,?,?,?,?,?,?,?)",
+                                     (pn,pr,pg,pt,pa,str(pdte),ptime,pdur,phall,did))
                         conn.commit(); conn.close(); delayed_refresh("Scheduled!")
 
 # --- TAB 4: ADMIN CONTROL ---
@@ -210,7 +210,7 @@ with tabs[3]:
             
             body = "SNU Research Presentation Schedule:\n\n"
             for _, r in df.iterrows():
-                body += f"🔹 {r['title']}\n🗓️ {r['date']} | 🕒 {r['time']}\n👤 {r['presenter']} (Guide: {r['guide_name']})\n {r['Meeting Link']} 📍 {r['venue_hall']}\n\n"
+                body += f"🔹 {r['title']}\n🗓️ {r['date']} | 🕒 {r['time']}\n👤 {r['presenter']} (Guide: {r['guide_name']})\n📍 {r['venue_hall']}\n\n"
             
             if st.button("🚀 Send Emails"):
                 with st.spinner("⏳ Broadcasting..."):
@@ -222,7 +222,3 @@ with tabs[3]:
                     res = send_mail("Research Schedule Update", body, list_re, sem, spa)
                     if res == True: st.success("Broadcast successful!")
                     else: st.error(res)
-
-
-
-
