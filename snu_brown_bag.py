@@ -3,7 +3,8 @@ import sqlite3
 import pandas as pd
 import smtplib
 import time
-import plotly.io as pio
+import matplotlib.pyplot as plt
+import io
 import os
 from email.mime.text import MIMEText
 from datetime import datetime, time as dt_time
@@ -536,15 +537,32 @@ with tabs[1]:
         # DOWNLOAD DASHBOARD IMAGE
         # =========================
         dashboard_image = "dashboard_snapshot.png"
-        pio.write_image(fig_month, dashboard_image)
+        st.markdown("### 📥 Download VC Dashboard Image")
 
-        with open(dashboard_image, "rb") as f:
-            st.download_button(
-                "🖼 Download Trend Chart as Image",
-                f,
-                file_name="Research_Trend.png",
-            )
+dashboard_image = io.BytesIO()
 
+# Prepare monthly data
+monthly_data = filtered_df.groupby(["year", "month"]).size().reset_index(name="count")
+
+plt.figure(figsize=(10,6))
+plt.plot(monthly_data["month"], monthly_data["count"])
+plt.title("Monthly Presentation Trends")
+plt.xlabel("Month")
+plt.ylabel("Number of Presentations")
+
+plt.tight_layout()
+plt.savefig(dashboard_image, format="png")
+plt.close()
+
+dashboard_image.seek(0)
+
+st.download_button(
+    "Download Dashboard as Image",
+    data=dashboard_image,
+    file_name="VC_Dashboard.png",
+    mime="image/png"
+)
+        
         os.remove(dashboard_image)
 
     else:
@@ -980,6 +998,7 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
+
 
 
 
