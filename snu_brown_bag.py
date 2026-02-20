@@ -58,7 +58,10 @@ def send_mail(subject, body, recipients, sender_email, app_password):
     msg["From"] = sender_email
     msg["To"] = ", ".join(recipients)
     try:
-        server = smtplib.SMTP("smtp.gmail.com", 587, timeout=10)
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.ehlo()
+        server.starttls()
+        server.ehlo()
         server.starttls()
         server.login(sender_email, app_password)
         server.sendmail(sender_email, recipients, msg.as_string())
@@ -648,3 +651,4 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
+
