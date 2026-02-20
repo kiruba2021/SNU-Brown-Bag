@@ -658,7 +658,7 @@ with tabs[3]:
         Department: {row['Dept']}
         Title: {row['title']}
         Presenter: {row['presenter']}
-        Guide/Supervisor: {row['guide_name']}
+        Guide: {row['guide_name']}
         Date: {row['date']}
         Time: {row['time']}
         Venue: {row['venue_hall']}
@@ -689,4 +689,5 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
+
 
