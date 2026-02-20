@@ -106,7 +106,7 @@ def generate_pdf_report(df):
 
     fig1, fig2 = get_plots(df)
 
-     return pdf.output(dest="S").encode("latin-1")
+    return pdf.output(dest="S").encode("latin-1")
 
 
 # --- 4. APP INTERFACE ---
@@ -678,6 +678,7 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
+
 
 
 
