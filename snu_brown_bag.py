@@ -628,7 +628,7 @@ with tabs[3]:
 
                     upcoming_mail = pd.read_sql_query(
                         """
-                        SELECT p.date, p.time, p.title, p.presenter, p.venue_hall, d.name as Dept
+                        SELECT p.date, p.time, p.title, p.presenter, p.guide_name, p.venue_hall, d.name as Dept
                         FROM presentations p
                         JOIN departments d ON p.dept_id = d.id
                         WHERE date >= ?
@@ -689,5 +689,6 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
+
 
 
