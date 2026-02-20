@@ -99,66 +99,83 @@ def get_plots(df):
 
 def generate_pdf_report(df):
 
-    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle
-    from reportlab.lib.styles import ParagraphStyle
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle, PageBreak
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib import colors
     from reportlab.lib.pagesizes import A4
     from reportlab.lib.units import inch
-    from reportlab.platypus import PageBreak
-    from reportlab.lib.styles import getSampleStyleSheet
-    from reportlab.platypus import ListFlowable, ListItem
+    from reportlab.pdfbase.ttfonts import TTFont
+    from reportlab.pdfbase import pdfmetrics
     import matplotlib.pyplot as plt
     import pandas as pd
     import numpy as np
     import os
 
-    file_path = "institutional_report.pdf"
+    file_path = "institutional_analytics_report.pdf"
     doc = SimpleDocTemplate(file_path, pagesize=A4)
     elements = []
 
     styles = getSampleStyleSheet()
-    title_style = styles["Heading1"]
-    normal_style = styles["Normal"]
 
     # ===============================
-    # EXECUTIVE SUMMARY
+    # EXECUTIVE SUMMARY PAGE
     # ===============================
 
-    elements.append(Paragraph("SNU Brown Bag Research Analytics Report", title_style))
+    elements.append(Paragraph("<b>SNU Brown Bag Research Analytics Report</b>", styles["Title"]))
     elements.append(Spacer(1, 0.3 * inch))
 
     total_presentations = len(df)
     total_departments = df["Dept"].nunique()
     total_presenters = df["presenter"].nunique()
 
-    summary_text = f"""
-    Total Presentations: {total_presentations}<br/>
-    Total Departments Engaged: {total_departments}<br/>
-    Total Unique Presenters: {total_presenters}
-    """
-
-    elements.append(Paragraph(summary_text, normal_style))
-    elements.append(Spacer(1, 0.5 * inch))
-
-    # ===============================
-    # MONTHLY ANALYTICS
-    # ===============================
-
     df["date"] = pd.to_datetime(df["date"])
+    df["Year"] = df["date"].dt.year
     df["YearMonth"] = df["date"].dt.to_period("M").astype(str)
 
+    yearly_counts = df.groupby("Year").size()
     monthly_counts = df.groupby("YearMonth").size()
 
-    plt.figure()
-    monthly_counts.plot(kind="bar")
-    plt.title("Monthly Presentation Frequency")
+    if len(yearly_counts) > 1:
+        yoy_growth = round(yearly_counts.pct_change().iloc[-1] * 100, 2)
+    else:
+        yoy_growth = 0
+
+    intensity_index = round(total_presentations / total_departments, 2)
+
+    summary_data = [
+        ["Total Presentations", total_presentations],
+        ["Departments Engaged", total_departments],
+        ["Unique Presenters", total_presenters],
+        ["Research Intensity Index", intensity_index],
+        ["Year-over-Year Growth %", f"{yoy_growth}%"]
+    ]
+
+    summary_table = Table(summary_data, colWidths=[250, 100])
+    summary_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,-1), colors.whitesmoke),
+        ('ROWBACKGROUNDS', (0,0), (-1,-1), [colors.whitesmoke, colors.lightblue]),
+        ('GRID', (0,0), (-1,-1), 0.5, colors.grey),
+        ('TEXTCOLOR', (1,0), (1,-1), colors.darkblue)
+    ]))
+
+    elements.append(summary_table)
+    elements.append(PageBreak())
+
+    # ===============================
+    # MONTHLY TRENDS CHART
+    # ===============================
+
+    plt.figure(figsize=(8,4))
+    monthly_counts.plot(kind="bar", color="#1f77b4")
+    plt.title("Monthly Presentation Trends")
+    plt.xticks(rotation=45)
     plt.tight_layout()
     plt.savefig("monthly.png")
     plt.close()
 
-    elements.append(Paragraph("Monthly Presentation Trends", styles["Heading2"]))
+    elements.append(Paragraph("<b>Monthly Trends Analysis</b>", styles["Heading2"]))
     elements.append(Spacer(1, 0.2 * inch))
-    elements.append(Image("monthly.png", width=5*inch, height=3*inch))
+    elements.append(Image("monthly.png", width=6*inch, height=3*inch))
     elements.append(PageBreak())
 
     # ===============================
@@ -166,59 +183,56 @@ def generate_pdf_report(df):
     # ===============================
 
     dept_counts = df.groupby("Dept").size().sort_values(ascending=False)
+    dept_counts = dept_counts.reset_index()
+    dept_counts.columns = ["Department", "Presentations"]
 
-    dept_table_data = [["Department", "Presentations"]]
-    for dept, count in dept_counts.items():
-        dept_table_data.append([dept, count])
+    dept_counts["Rank"] = dept_counts["Presentations"].rank(ascending=False).astype(int)
+    dept_counts["Performance Score"] = round(
+        (dept_counts["Presentations"] / dept_counts["Presentations"].max()) * 100, 2
+    )
 
-    dept_table = Table(dept_table_data)
+    table_data = [dept_counts.columns.tolist()] + dept_counts.values.tolist()
+
+    dept_table = Table(table_data)
     dept_table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.lightblue),
+        ('BACKGROUND', (0,0), (-1,0), colors.darkblue),
+        ('TEXTCOLOR', (0,0), (-1,0), colors.white),
+        ('ROWBACKGROUNDS', (0,1), (-1,-1), [colors.whitesmoke, colors.lightgrey]),
         ('GRID', (0,0), (-1,-1), 0.5, colors.grey)
     ]))
 
-    elements.append(Paragraph("Department Performance Ranking", styles["Heading2"]))
+    elements.append(Paragraph("<b>Department Ranking & Performance Score</b>", styles["Heading2"]))
     elements.append(Spacer(1, 0.2 * inch))
     elements.append(dept_table)
-    elements.append(Spacer(1, 0.5 * inch))
+    elements.append(Spacer(1, 0.3 * inch))
 
-    plt.figure()
-    dept_counts.plot(kind="bar")
-    plt.title("Department-wise Distribution")
+    # Department Distribution Chart
+    plt.figure(figsize=(8,4))
+    dept_counts.set_index("Department")["Presentations"].plot(kind="bar", color="#ff7f0e")
+    plt.title("Department Distribution")
+    plt.xticks(rotation=45)
     plt.tight_layout()
     plt.savefig("dept.png")
     plt.close()
 
-    elements.append(Image("dept.png", width=5*inch, height=3*inch))
+    elements.append(Image("dept.png", width=6*inch, height=3*inch))
     elements.append(PageBreak())
 
     # ===============================
-    # RESEARCH INTENSITY INDEX
+    # YEARLY GROWTH VISUAL
     # ===============================
-
-    intensity_index = round(total_presentations / total_departments, 2)
-
-    elements.append(Paragraph("Research Intensity Index", styles["Heading2"]))
-    elements.append(Spacer(1, 0.2 * inch))
-    elements.append(Paragraph(
-        f"Research Intensity Index = {intensity_index} presentations per department",
-        normal_style
-    ))
-
-    # ===============================
-    # YEAR OVER YEAR GROWTH
-    # ===============================
-
-    df["Year"] = df["date"].dt.year
-    yearly_counts = df.groupby("Year").size()
 
     if len(yearly_counts) > 1:
-        yoy_growth = yearly_counts.pct_change().iloc[-1] * 100
-        elements.append(Spacer(1, 0.3 * inch))
-        elements.append(Paragraph(
-            f"Year-over-Year Growth: {round(yoy_growth,2)}%",
-            normal_style
-        ))
+        plt.figure(figsize=(8,4))
+        yearly_counts.plot(kind="line", marker='o', color="green")
+        plt.title("Yearly Growth Trend")
+        plt.tight_layout()
+        plt.savefig("yearly.png")
+        plt.close()
+
+        elements.append(Paragraph("<b>Year-over-Year Growth Analysis</b>", styles["Heading2"]))
+        elements.append(Spacer(1, 0.2 * inch))
+        elements.append(Image("yearly.png", width=6*inch, height=3*inch))
 
     # ===============================
     # BUILD PDF
@@ -226,8 +240,9 @@ def generate_pdf_report(df):
 
     doc.build(elements)
 
-    os.remove("monthly.png")
-    os.remove("dept.png")
+    for f in ["monthly.png", "dept.png", "yearly.png"]:
+        if os.path.exists(f):
+            os.remove(f)
 
     with open(file_path, "rb") as f:
         pdf_data = f.read()
@@ -235,7 +250,6 @@ def generate_pdf_report(df):
     os.remove(file_path)
 
     return pdf_data
-
 
 # --- 4. APP INTERFACE ---
 
@@ -806,6 +820,7 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
+
 
 
 
