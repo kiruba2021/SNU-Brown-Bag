@@ -64,7 +64,7 @@ def send_mail(subject, body, recipients, sender_email, app_password):
         server.quit()
         return True
     except Exception as e:
-    return f"Mail Error: {str(e)}"
+        return f"Mail Error: {str(e)}"
 
 
 def delayed_refresh(message, icon="✅"):
@@ -647,5 +647,6 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
+
 
 
