@@ -6,3 +6,4 @@ numpy
 kaleido
 matplotlib
 reportlab
+python-3.10
