@@ -106,23 +106,6 @@ def generate_pdf_report(df):
 
     fig1, fig2 = get_plots(df)
 
-    import io
-
-    img_bytes1 = fig1.to_image(format="png")
-    img_bytes2 = fig2.to_image(format="png")
-
-    with open("plot_dept.png", "wb") as f:
-        f.write(img_bytes1)
-
-    with open("plot_role.png", "wb") as f:
-        f.write(img_bytes2)
-        
-     pdf.image("plot_dept.png", x=10, y=40, w=180)
-     pdf.image("plot_role.png", x=50, y=150, w=110)
-
-     os.remove("plot_dept.png")
-     os.remove("plot_role.png")
-
      return pdf.output(dest="S").encode("latin-1")
 
 
@@ -695,6 +678,7 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
+
 
 
 
