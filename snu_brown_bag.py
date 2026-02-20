@@ -238,6 +238,14 @@ with tabs[0]:
             "venue_hall",
         ]
         safe_cols = [col for col in display_cols if col in previous.columns]
+        if not safe_cols:
+        st.error("No matching columns found.")
+    else:
+        st.dataframe(
+            previous[safe_cols]
+            .sort_values(["date", "time"], ascending=False),
+            use_container_width=True,
+        )
     st.dataframe(
         previous[safe_cols].sort_values(["date", "time"], ascending=False),
         use_container_width=True,
@@ -689,6 +697,7 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
+
 
 
 
