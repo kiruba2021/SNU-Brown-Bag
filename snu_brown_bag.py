@@ -562,9 +562,6 @@ st.download_button(
     file_name="VC_Dashboard.png",
     mime="image/png"
 )
-
-    else:
-        st.warning("No data available for analytics.")
 # --- TAB 3: COORDINATOR ---
 
 
@@ -996,6 +993,7 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
+
 
 
 
