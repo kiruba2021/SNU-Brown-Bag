@@ -665,7 +665,7 @@ with tabs[3]:
         Guide: {row['guide_name']}
         Date: {row['date']}
         Time: {row['time']}
-        Venue: {row['venue_hall']}
+        Venue / Meeting Link: {row['venue_hall']}
         -------------------------------------------
         """
                         body += f"\nView Full Schedule Here:\n{portal_link}"
@@ -693,6 +693,7 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
+
 
 
 
