@@ -5,3 +5,4 @@ plotly
 numpy
 kaleido
 matplotlib
+reportlab
