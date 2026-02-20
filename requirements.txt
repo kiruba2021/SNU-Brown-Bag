@@ -3,3 +3,7 @@ pandas
 fpdf2
 matplotlib
 reportlab
+numpy
+plotly
+openpyxl
+xlsxwriter
