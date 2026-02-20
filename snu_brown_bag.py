@@ -105,12 +105,6 @@ def generate_pdf_report(df):
     pdf.cell(200, 20, txt="SNU Brown Bag Research Analytics Report", ln=True, align="C")
 
     fig1, fig2 = get_plots(df)
-    fig1.write_image("plot_dept.png")
-    fig2.write_image("plot_role.png")
-
-    # Image 1 placement
-
-    fig1, fig2 = get_plots(df)
 
     import io
 
@@ -122,7 +116,13 @@ def generate_pdf_report(df):
 
     with open("plot_role.png", "wb") as f:
         f.write(img_bytes2)
+    pdf.image("plot_dept.png", x=10, y=40, w=180)
+    pdf.image("plot_role.png", x=50, y=150, w=110)
 
+    os.remove("plot_dept.png")
+    os.remove("plot_role.png")
+
+    return pdf.output(dest="S").encode("latin-1")
 
 # --- 4. APP INTERFACE ---
 
@@ -696,6 +696,7 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
+
 
 
 
