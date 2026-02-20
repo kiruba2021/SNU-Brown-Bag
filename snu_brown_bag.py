@@ -622,7 +622,48 @@ with tabs[3]:
                         )["email"].tolist()
                     conn.close()
 
-                    body = "SNU Research Presentation Schedule Update.\nCheck portal for details."
+                    today = datetime.now().strftime("%Y-%m-%d")
+
+                    conn = sqlite3.connect("ssn_research.db")
+
+                    upcoming_mail = pd.read_sql_query(
+                        """
+                        SELECT p.date, p.time, p.title, p.presenter, p.venue_hall, d.name as Dept
+                        FROM presentations p
+                        JOIN departments d ON p.dept_id = d.id
+                        WHERE date >= ?
+                        ORDER BY date ASC, time ASC
+                        """,
+                        conn,
+                        params=(today,),
+                    )
+
+                    conn.close()
+                    portal_link = "https://your-streamlit-app-link.streamlit.app"
+
+                    if upcoming_mail.empty:
+                        body = f"""
+        SNU Brown Bag Research Portal Update
+
+        There are currently no upcoming presentations.
+
+        Visit Portal:
+        {portal_link}
+        """
+                    else:
+                        body = "SNU Brown Bag Research – Upcoming Presentations\n\n"
+
+                        for _, row in upcoming_mail.iterrows():
+                            body += f"""
+        Department: {row['Dept']}
+        Title: {row['title']}
+        Presenter: {row['presenter']}
+        Date: {row['date']}
+        Time: {row['time']}
+        Venue: {row['venue_hall']}
+        -------------------------------------------
+        """
+                        body += f"\nView Full Schedule Here:\n{portal_link}"
                     res = send_mail("Research Schedule Update", body, list_re, sem, spa)
                     if res == True:
                         st.success("Broadcast successful!")
@@ -647,6 +688,3 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
-
-
-
