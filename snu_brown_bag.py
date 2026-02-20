@@ -98,13 +98,12 @@ def get_plots(df):
 
 
 def generate_pdf_report(df):
-    import io
-    import pandas as pd
     from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
     from reportlab.lib import colors
     from reportlab.lib.styles import getSampleStyleSheet
     from reportlab.lib import pagesizes
     from reportlab.lib.units import inch
+    import io
 
     buffer = io.BytesIO()
     doc = SimpleDocTemplate(buffer, pagesize=pagesizes.A4)
@@ -112,78 +111,27 @@ def generate_pdf_report(df):
 
     styles = getSampleStyleSheet()
 
-    # -------------------------
     # Title
-    # -------------------------
-    elements.append(Paragraph("<b>SNU Brown Bag Research Analytics Report</b>", styles["Title"]))
-    elements.append(Spacer(1, 0.3 * inch))
+    elements.append(Paragraph("<b>SNU Brown Bag Research Report</b>", styles["Title"]))
+    elements.append(Spacer(1, 0.5 * inch))
 
-    # -------------------------
-    # Overall Summary
-    # -------------------------
-    total_presentations = len(df)
-    elements.append(Paragraph(f"<b>Total Presentations:</b> {total_presentations}", styles["Normal"]))
-    elements.append(Spacer(1, 0.3 * inch))
-
-    # -------------------------
-    # Department-wise Count
-    # -------------------------
+    # Summary Table
     dept_counts = df["Dept"].value_counts().reset_index()
-    dept_counts.columns = ["Department", "Number of Presentations"]
+    dept_counts.columns = ["Department", "Presentations"]
 
-    elements.append(Paragraph("<b>Department-wise Presentations</b>", styles["Heading2"]))
-    elements.append(Spacer(1, 0.2 * inch))
+    data = [dept_counts.columns.tolist()] + dept_counts.values.tolist()
 
-    dept_table = Table([dept_counts.columns.tolist()] + dept_counts.values.tolist())
-    dept_table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
-        ('GRID', (0,0), (-1,-1), 1, colors.grey),
-        ('ALIGN', (1,1), (-1,-1), 'CENTER')
-    ]))
-    elements.append(dept_table)
-    elements.append(Spacer(1, 0.4 * inch))
+    table = Table(data)
+    table.setStyle(
+        TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
+            ('GRID', (0,0), (-1,-1), 1, colors.grey),
+            ('ALIGN', (1,1), (-1,-1), 'CENTER')
+        ])
+    )
 
-    # -------------------------
-    # Presenter Role Distribution
-    # -------------------------
-    role_counts = df["designation"].value_counts().reset_index()
-    role_counts.columns = ["Presenter Role", "Count"]
+    elements.append(table)
 
-    elements.append(Paragraph("<b>Presenter Role Distribution</b>", styles["Heading2"]))
-    elements.append(Spacer(1, 0.2 * inch))
-
-    role_table = Table([role_counts.columns.tolist()] + role_counts.values.tolist())
-    role_table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
-        ('GRID', (0,0), (-1,-1), 1, colors.grey),
-        ('ALIGN', (1,1), (-1,-1), 'CENTER')
-    ]))
-    elements.append(role_table)
-    elements.append(Spacer(1, 0.4 * inch))
-
-    # -------------------------
-    # Month-wise Frequency (Year included)
-    # -------------------------
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
-    df["Month-Year"] = df["date"].dt.strftime("%B %Y")
-
-    monthly_counts = df["Month-Year"].value_counts().reset_index()
-    monthly_counts.columns = ["Month-Year", "Number of Presentations"]
-
-    elements.append(Paragraph("<b>Month-wise Presentation Frequency</b>", styles["Heading2"]))
-    elements.append(Spacer(1, 0.2 * inch))
-
-    monthly_table = Table([monthly_counts.columns.tolist()] + monthly_counts.values.tolist())
-    monthly_table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
-        ('GRID', (0,0), (-1,-1), 1, colors.grey),
-        ('ALIGN', (1,1), (-1,-1), 'CENTER')
-    ]))
-    elements.append(monthly_table)
-
-    # -------------------------
-    # Build PDF
-    # -------------------------
     doc.build(elements)
     pdf = buffer.getvalue()
     buffer.close()
@@ -622,6 +570,7 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
+
 
 
 
