@@ -106,7 +106,7 @@ def generate_pdf_report(df):
         Table, TableStyle, Image
     )
     from reportlab.lib import colors
-    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+    from reportlab.lib.styles import getSampleStyleSheet
     from reportlab.lib import pagesizes
     from reportlab.lib.units import inch
 
@@ -115,100 +115,42 @@ def generate_pdf_report(df):
     elements = []
     styles = getSampleStyleSheet()
 
-    # -----------------------------
-    # PREP DATA
-    # -----------------------------
-    df["date"] = pd.to_datetime(df["date"], errors="coerce")
-    df["Year"] = df["date"].dt.year
-    df["Month-Year"] = df["date"].dt.strftime("%B %Y")
+    # -------------------------
+    # Title
+    # -------------------------
+    elements.append(Paragraph("<b>SNU Brown Bag Research Analytics Report</b>", styles["Title"]))
+    elements.append(Spacer(1, 0.3 * inch))
 
-    total_presentations = len(df)
-    total_departments = df["Dept"].nunique()
-    total_roles = df["designation"].nunique()
-
-    top_dept = df["Dept"].value_counts().idxmax()
-    top_dept_count = df["Dept"].value_counts().max()
-
-    top_role = df["designation"].value_counts().idxmax()
-
-    peak_month = df["Month-Year"].value_counts().idxmax()
-
-    # -----------------------------
-    # TITLE PAGE
-    # -----------------------------
-    elements.append(Paragraph("<b>SNU Brown Bag Research Portal</b>", styles["Title"]))
-    elements.append(Spacer(1, 0.2 * inch))
-    elements.append(Paragraph("<b>Executive Annual Analytics Report</b>", styles["Heading1"]))
-    elements.append(Spacer(1, 0.5 * inch))
-
-    # -----------------------------
-    # EXECUTIVE SUMMARY
-    # -----------------------------
-    elements.append(Paragraph("<b>Executive Summary</b>", styles["Heading2"]))
-    elements.append(Spacer(1, 0.2 * inch))
-
-    summary_text = f"""
-    Total Presentations Conducted: {total_presentations}<br/>
-    Active Departments Participated: {total_departments}<br/>
-    Presenter Roles Represented: {total_roles}<br/><br/>
-
-    Highest Contributing Department: {top_dept} ({top_dept_count} presentations)<br/>
-    Most Active Presenter Category: {top_role}<br/>
-    Peak Activity Month: {peak_month}<br/>
-    """
-
-    elements.append(Paragraph(summary_text, styles["Normal"]))
-    elements.append(Spacer(1, 0.5 * inch))
-
-    # =============================
-    # KPI SECTION
-    # =============================
-    elements.append(Paragraph("<b>Key Performance Indicators</b>", styles["Heading2"]))
-    elements.append(Spacer(1, 0.2 * inch))
-
-    kpi_data = [
-        ["Metric", "Value"],
-        ["Total Presentations", total_presentations],
-        ["Departments Engaged", total_departments],
-        ["Presenter Categories", total_roles],
-        ["Top Department", top_dept],
-        ["Peak Month", peak_month],
-    ]
-
-    kpi_table = Table(kpi_data)
-    kpi_table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
-        ('GRID', (0,0), (-1,-1), 1, colors.grey),
-    ]))
-    elements.append(kpi_table)
-    elements.append(Spacer(1, 0.5 * inch))
-
-    # =============================
-    # DEPARTMENT ANALYSIS
-    # =============================
+    # =========================
+    # 1️⃣ Department-wise
+    # =========================
     dept_counts = df["Dept"].value_counts().reset_index()
     dept_counts.columns = ["Department", "Presentations"]
 
-    elements.append(Paragraph("<b>Department-wise Analysis</b>", styles["Heading2"]))
+    elements.append(Paragraph("<b>Department-wise Presentations</b>", styles["Heading2"]))
     elements.append(Spacer(1, 0.2 * inch))
 
     dept_table = Table([dept_counts.columns.tolist()] + dept_counts.values.tolist())
     dept_table.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
         ('GRID', (0,0), (-1,-1), 1, colors.grey),
+        ('ALIGN', (1,1), (-1,-1), 'CENTER')
     ]))
     elements.append(dept_table)
     elements.append(Spacer(1, 0.3 * inch))
 
+    # Department Chart
     fig_dept = px.bar(dept_counts, x="Department", y="Presentations",
                       title="Department-wise Presentation Count")
+
     img_bytes = fig_dept.to_image(format="png")
     elements.append(Image(io.BytesIO(img_bytes), width=5*inch, height=3*inch))
     elements.append(Spacer(1, 0.5 * inch))
 
-    # =============================
-    # ROLE ANALYSIS
-    # =============================
+
+    # =========================
+    # 2️⃣ Presenter Role
+    # =========================
     role_counts = df["designation"].value_counts().reset_index()
     role_counts.columns = ["Role", "Count"]
 
@@ -219,67 +161,76 @@ def generate_pdf_report(df):
     role_table.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
         ('GRID', (0,0), (-1,-1), 1, colors.grey),
+        ('ALIGN', (1,1), (-1,-1), 'CENTER')
     ]))
     elements.append(role_table)
     elements.append(Spacer(1, 0.3 * inch))
 
     fig_role = px.pie(role_counts, names="Role", values="Count",
                       title="Presenter Role Distribution")
+
     img_bytes = fig_role.to_image(format="png")
     elements.append(Image(io.BytesIO(img_bytes), width=4*inch, height=4*inch))
     elements.append(Spacer(1, 0.5 * inch))
 
-    # =============================
-    # MONTHLY TREND
-    # =============================
+
+    # =========================
+    # 3️⃣ Month-Year Frequency
+    # =========================
+    df["date"] = pd.to_datetime(df["date"], errors="coerce")
+    df["Month-Year"] = df["date"].dt.strftime("%B %Y")
+
     monthly_counts = df["Month-Year"].value_counts().reset_index()
     monthly_counts.columns = ["Month-Year", "Presentations"]
 
-    elements.append(Paragraph("<b>Monthly Presentation Trend</b>", styles["Heading2"]))
+    elements.append(Paragraph("<b>Month-wise Presentation Frequency</b>", styles["Heading2"]))
     elements.append(Spacer(1, 0.2 * inch))
 
+    monthly_table = Table([monthly_counts.columns.tolist()] + monthly_counts.values.tolist())
+    monthly_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
+        ('GRID', (0,0), (-1,-1), 1, colors.grey),
+        ('ALIGN', (1,1), (-1,-1), 'CENTER')
+    ]))
+    elements.append(monthly_table)
+    elements.append(Spacer(1, 0.3 * inch))
+
     fig_month = px.bar(monthly_counts, x="Month-Year", y="Presentations",
-                       title="Month-wise Trend")
+                       title="Monthly Presentation Trend")
+
     img_bytes = fig_month.to_image(format="png")
     elements.append(Image(io.BytesIO(img_bytes), width=5*inch, height=3*inch))
     elements.append(Spacer(1, 0.5 * inch))
 
-    # =============================
-    # YEAR x DEPARTMENT
-    # =============================
+
+    # =========================
+    # 4️⃣ Year-wise by Department
+    # =========================
+    df["Year"] = df["date"].dt.year
+
     year_dept = df.groupby(["Year", "Dept"]).size().reset_index(name="Count")
 
-    elements.append(Paragraph("<b>Year-wise Department Comparison</b>", styles["Heading2"]))
-    elements.append(Spacer(1, 0.2 * inch))
+    elements.append(Paragraph("<b>Year-wise Presentations by Department</b>", styles["Heading2"]))
+    elements.append(Spacer(1, 0.3 * inch))
 
-    fig_year = px.bar(year_dept, x="Year", y="Count",
-                      color="Dept", barmode="group",
-                      title="Year-wise Department Trend")
+    fig_year_dept = px.bar(year_dept, x="Year", y="Count",
+                           color="Dept",
+                           barmode="group",
+                           title="Year-wise Department Trend")
 
-    img_bytes = fig_year.to_image(format="png")
+    img_bytes = fig_year_dept.to_image(format="png")
     elements.append(Image(io.BytesIO(img_bytes), width=5*inch, height=3*inch))
-    elements.append(Spacer(1, 0.5 * inch))
 
-    # =============================
-    # STRATEGIC INSIGHTS
-    # =============================
-    elements.append(Paragraph("<b>Strategic Insights & Recommendations</b>", styles["Heading2"]))
-    elements.append(Spacer(1, 0.2 * inch))
 
-    insights = f"""
-    • {top_dept} demonstrates strong research engagement and leadership.<br/>
-    • Increased participation from underrepresented departments is recommended.<br/>
-    • {peak_month} indicates peak academic research activity cycle.<br/>
-    • Consider structured monthly scheduling to ensure balanced distribution.<br/>
-    """
-
-    elements.append(Paragraph(insights, styles["Normal"]))
-
-    # -----------------------------
+    # -------------------------
+    # Build PDF
+    # -------------------------
     doc.build(elements)
     pdf = buffer.getvalue()
     buffer.close()
+
     return pdf
+    
 # --- TAB 3: COORDINATOR ---
 
 
@@ -712,6 +663,7 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
+
 
 
 
