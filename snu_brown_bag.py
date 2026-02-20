@@ -237,11 +237,13 @@ with tabs[0]:
             "duration",
             "venue_hall",
         ]
+
         safe_cols = [col for col in display_cols if col in previous.columns]
-    st.dataframe(
-        previous[safe_cols].sort_values(["date", "time"], ascending=False),
-        use_container_width=True,
-    )
+
+        st.dataframe(
+            previous[safe_cols].sort_values(["date", "time"], ascending=False),
+            use_container_width=True,
+        )
     conn.close()
 # --- TAB 2: ANALYTICS ---
 
@@ -688,4 +690,5 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
+
 
