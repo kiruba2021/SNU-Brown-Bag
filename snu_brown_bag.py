@@ -73,7 +73,7 @@ def delayed_refresh(message, icon="✅"):
     st.rerun()
 
 
-# --- 3. ANALYTICS &  ENGINE ---
+# --- 3. ANALYTICS & PDF ENGINE ---
 
 
 def get_plots(df):
@@ -98,130 +98,165 @@ def get_plots(df):
 
 
 def generate_pdf_report(df):
-    import matplotlib.pyplot as plt
-    import io
-    from fpdf import FPDF
-    import pandas as pd
-    from datetime import datetime
-
     pdf = FPDF()
-    pdf.set_auto_page_break(auto=True, margin=15)
-
-    # ======================================================
-    # DATA PREPARATION
-    # ======================================================
-
-    df["date"] = pd.to_datetime(df["date"])
-    df["Year"] = df["date"].dt.year
-    df["Month"] = df["date"].dt.to_period("M").astype(str)
-
-    total_presentations = len(df)
-    total_departments = df["Dept"].nunique()
-
-    dept_counts = df["Dept"].value_counts()
-    ranking_df = dept_counts.reset_index()
-    ranking_df.columns = ["Department", "Presentations"]
-    ranking_df["Rank"] = ranking_df["Presentations"].rank(
-        ascending=False, method="dense"
-    ).astype(int)
-
-    monthly_counts = df.groupby("Month").size()
-
-    # ======================================================
-    # PAGE 1 – EXECUTIVE SUMMARY
-    # ======================================================
-
     pdf.add_page()
+    pdf.set_text_color(0, 51, 102)
     pdf.set_font("Arial", "B", 20)
-    pdf.cell(0, 15, "SNU Brown Bag Research Analytics Report", ln=True, align="C")
+    pdf.cell(200, 20, txt="SNU Brown Bag Research Analytics Report", ln=True, align="C")
 
-    pdf.set_font("Arial", "", 12)
-    pdf.ln(10)
+    fig1, fig2 = get_plots(df)
+    fig1.write_image("plot_dept.png")
+    fig2.write_image("plot_role.png")
 
-    pdf.multi_cell(
-        0,
-        8,
-        f"""
-EXECUTIVE SUMMARY
+    # Image 1 placement
 
-Total Presentations Conducted: {total_presentations}
-Total Participating Departments: {total_departments}
+    pdf.image("plot_dept.png", x=10, y=40, w=180)
 
-Highest Performing Department: {ranking_df.iloc[0]['Department']}
-Presentations by Top Department: {ranking_df.iloc[0]['Presentations']}
+    # Descent spacing: Image 2 starts much lower (y=150) to avoid overlap
 
-Report Generated On: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
-""",
+    pdf.image("plot_role.png", x=50, y=150, w=110)
+
+    os.remove("plot_dept.png")
+    os.remove("plot_role.png")
+    return pdf.output(dest="S").encode("latin-1")
+
+
+# --- 4. APP INTERFACE ---
+
+
+st.set_page_config(page_title="SNU | Brown Bag Portal", layout="wide")
+init_db()
+
+TIME_SLOTS = [
+    dt_time(h, m).strftime("%I:%M %p") for h in range(8, 20) for m in (0, 15, 30, 45)
+]
+DURATIONS = ["30 mins", "45 mins", "1 hour", "1.5 hours", "2 hours"]
+
+if "auth" not in st.session_state:
+    st.session_state["auth"] = False
+if "dept" not in st.session_state:
+    st.session_state["dept"] = None
+st.title("🎓 Shiv Nadar University | Brown Bag Portal")
+tabs = st.tabs(
+    ["📅 Public Schedule", "📊 Analytics", "🔐 Coordinator Access", "🛠️ Admin Control"]
+)
+
+conn = sqlite3.connect("ssn_research.db")
+df = pd.read_sql_query(
+    "SELECT p.*, d.name as Dept FROM presentations p JOIN departments d ON p.dept_id = d.id",
+    conn,
+)
+conn.close()
+# 🔹 Columns used across tabs
+
+
+display_cols = [
+    "id",
+    "date",
+    "time",
+    "title",
+    "presenter",
+    "designation",
+    "guide_name",
+    "duration",
+    "venue_hall",
+    "Dept",
+]
+
+# --- TAB 1: PUBLIC SCHEDULE ---
+
+
+with tabs[0]:
+    st.subheader("📅 Public Presentation Schedule")
+
+    conn = sqlite3.connect("ssn_research.db")
+    today = datetime.now().strftime("%Y-%m-%d")
+
+    # 🔹 Upcoming
+
+    upcoming = pd.read_sql_query(
+        """
+        SELECT p.*, d.name as Dept
+        FROM presentations p
+        JOIN departments d ON p.dept_id = d.id
+        WHERE date >= ?
+        ORDER BY date ASC, time ASC
+    """,
+        conn,
+        params=(today,),
     )
 
-    # ======================================================
-    # PAGE 2 – DEPARTMENT RANKING TABLE
-    # ======================================================
+    st.markdown("## 📌 Upcoming Presentations")
 
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, "Department Performance Ranking", ln=True)
-
-    pdf.ln(5)
-    pdf.set_font("Arial", "", 11)
-
-    for _, row in ranking_df.iterrows():
-        pdf.cell(
-            0,
-            8,
-            f"Rank {row['Rank']} - {row['Department']} ({row['Presentations']} presentations)",
-            ln=True,
+    if upcoming.empty:
+        st.info("No upcoming presentations.")
+    else:
+        display_cols = [
+            "date",
+            "time",
+            "Dept",
+            "title",
+            "presenter",
+            "designation",
+            "guide_name",
+            "duration",
+            "venue_hall/Meeting Link",
+        ]
+        safe_cols = [col for col in display_cols if col in upcoming.columns]
+        st.dataframe(
+            upcoming[safe_cols].sort_values(["date", "time"]),
+            use_container_width=True,
         )
+    # 🔹 Previous
 
-    # ======================================================
-    # PAGE 3 – PRESENTATIONS BY DEPARTMENT (BAR CHART)
-    # ======================================================
+    previous = pd.read_sql_query(
+        """
+        SELECT p.*, d.name as Dept
+        FROM presentations p
+        JOIN departments d ON p.dept_id = d.id
+        WHERE date < ?
+        ORDER BY date DESC, time DESC
+    """,
+        conn,
+        params=(today,),
+    )
 
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, "Presentations by Department", ln=True)
+    st.markdown("## 📜 Previous Presentations")
 
-    plt.figure()
-    dept_counts.plot(kind="bar")
-    plt.title("Department-wise Presentation Count")
-    plt.xticks(rotation=45)
-    plt.tight_layout()
+    if previous.empty:
+        st.info("No previous presentations.")
+    else:
+        display_cols = [
+            "date",
+            "time",
+            "Dept",
+            "title",
+            "presenter",
+            "designation",
+            "guide_name",
+            "duration",
+            "venue_hall",
+        ]
+        safe_cols = [col for col in display_cols if col in upcoming.columns]
+    st.dataframe(
+        previous[safe_cols].sort_values(["date", "time"], ascending=False),
+        use_container_width=True,
+    )
+    conn.close()
+# --- TAB 2: ANALYTICS ---
 
-    img_buffer = io.BytesIO()
-    plt.savefig(img_buffer, format="png")
-    plt.close()
-    img_buffer.seek(0)
 
-    with open("dept_chart.png", "wb") as f:
-        f.write(img_buffer.read())
-
-    pdf.image("dept_chart.png", x=10, y=30, w=180)
-
-    # ======================================================
-    # PAGE 4 – MONTHLY TREND ANALYSIS
-    # ======================================================
-
-    pdf.add_page()
-    pdf.set_font("Arial", "B", 16)
-    pdf.cell(0, 10, "Monthly Research Activity Trend", ln=True)
-
-    plt.figure()
-    monthly_counts.plot(marker="o")
-    plt.title("Monthly Presentation Frequency")
-    plt.xticks(rotation=45)
-    plt.tight_layout()
-
-    img_buffer2 = io.BytesIO()
-    plt.savefig(img_buffer2, format="png")
-    plt.close()
-    img_buffer2.seek(0)
-
-    with open("monthly_chart.png", "wb") as f:
-        f.write(img_buffer2.read())
-
-    pdf.image("monthly_chart.png", x=10, y=30, w=180)
-
-    return pdf.output(dest="S").encode("latin-1")
+with tabs[1]:
+    if not df.empty:
+        st.subheader("Presentation Statistics")
+        f1, f2 = get_plots(df)
+        col1, col2 = st.columns(2)
+        with col1:
+            st.plotly_chart(f1, use_container_width=True)
+        with col2:
+            st.plotly_chart(f2, use_container_width=True)
+    else:
+        st.warning("No data available for analytics yet.")
 # --- TAB 3: COORDINATOR ---
 
 
@@ -593,7 +628,7 @@ with tabs[3]:
 
                     upcoming_mail = pd.read_sql_query(
                         """
-                        SELECT p.date, p.time, p.title, p.presenter, p.guide_name, p.venue_hall, d.name as Dept
+                        SELECT p.date, p.time, p.title, p.presenter, p.venue_hall, d.name as Dept
                         FROM presentations p
                         JOIN departments d ON p.dept_id = d.id
                         WHERE date >= ?
@@ -623,10 +658,9 @@ with tabs[3]:
         Department: {row['Dept']}
         Title: {row['title']}
         Presenter: {row['presenter']}
-        Guide: {row['guide_name']}
         Date: {row['date']}
         Time: {row['time']}
-        Venue / Meeting Link: {row['venue_hall']}
+        Venue: {row['venue_hall']}
         -------------------------------------------
         """
                         body += f"\nView Full Schedule Here:\n{portal_link}"
@@ -654,23 +688,3 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
