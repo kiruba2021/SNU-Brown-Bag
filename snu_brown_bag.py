@@ -98,29 +98,128 @@ def get_plots(df):
 
 
 def generate_pdf_report(df):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_text_color(0, 51, 102)
-    pdf.set_font("Arial", "B", 20)
-    pdf.cell(200, 20, txt="SNU Brown Bag Research Analytics Report", ln=True, align="C")
-
-    fig1, fig2 = get_plots(df)
-
+    import matplotlib.pyplot as plt
     import io
-    img_bytes1 = fig1.to_image(format="png")
-    img_bytes2 = fig2.to_image(format="png")
+    from fpdf import FPDF
+    import pandas as pd
+    from datetime import datetime
 
-    with open("plot_dept.png", "wb") as f:
-        f.write(img_bytes1)
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
 
-    with open("plot_role.png", "wb") as f:
-        f.write(img_bytes2)
+    # ======================================================
+    # DATA PREPARATION
+    # ======================================================
 
-    pdf.image("plot_dept.png", x=10, y=40, w=180)
-    pdf.image("plot_role.png", x=50, y=150, w=110)
+    df["date"] = pd.to_datetime(df["date"])
+    df["Year"] = df["date"].dt.year
+    df["Month"] = df["date"].dt.to_period("M").astype(str)
 
-    os.remove("plot_dept.png")
-    os.remove("plot_role.png")
+    total_presentations = len(df)
+    total_departments = df["Dept"].nunique()
+
+    dept_counts = df["Dept"].value_counts()
+    ranking_df = dept_counts.reset_index()
+    ranking_df.columns = ["Department", "Presentations"]
+    ranking_df["Rank"] = ranking_df["Presentations"].rank(
+        ascending=False, method="dense"
+    ).astype(int)
+
+    monthly_counts = df.groupby("Month").size()
+
+    # ======================================================
+    # PAGE 1 – EXECUTIVE SUMMARY
+    # ======================================================
+
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 20)
+    pdf.cell(0, 15, "SNU Brown Bag Research Analytics Report", ln=True, align="C")
+
+    pdf.set_font("Arial", "", 12)
+    pdf.ln(10)
+
+    pdf.multi_cell(
+        0,
+        8,
+        f"""
+EXECUTIVE SUMMARY
+
+Total Presentations Conducted: {total_presentations}
+Total Participating Departments: {total_departments}
+
+Highest Performing Department: {ranking_df.iloc[0]['Department']}
+Presentations by Top Department: {ranking_df.iloc[0]['Presentations']}
+
+Report Generated On: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}
+""",
+    )
+
+    # ======================================================
+    # PAGE 2 – DEPARTMENT RANKING TABLE
+    # ======================================================
+
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(0, 10, "Department Performance Ranking", ln=True)
+
+    pdf.ln(5)
+    pdf.set_font("Arial", "", 11)
+
+    for _, row in ranking_df.iterrows():
+        pdf.cell(
+            0,
+            8,
+            f"Rank {row['Rank']} - {row['Department']} ({row['Presentations']} presentations)",
+            ln=True,
+        )
+
+    # ======================================================
+    # PAGE 3 – PRESENTATIONS BY DEPARTMENT (BAR CHART)
+    # ======================================================
+
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(0, 10, "Presentations by Department", ln=True)
+
+    plt.figure()
+    dept_counts.plot(kind="bar")
+    plt.title("Department-wise Presentation Count")
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+
+    img_buffer = io.BytesIO()
+    plt.savefig(img_buffer, format="png")
+    plt.close()
+    img_buffer.seek(0)
+
+    with open("dept_chart.png", "wb") as f:
+        f.write(img_buffer.read())
+
+    pdf.image("dept_chart.png", x=10, y=30, w=180)
+
+    # ======================================================
+    # PAGE 4 – MONTHLY TREND ANALYSIS
+    # ======================================================
+
+    pdf.add_page()
+    pdf.set_font("Arial", "B", 16)
+    pdf.cell(0, 10, "Monthly Research Activity Trend", ln=True)
+
+    plt.figure()
+    monthly_counts.plot(marker="o")
+    plt.title("Monthly Presentation Frequency")
+    plt.xticks(rotation=45)
+    plt.tight_layout()
+
+    img_buffer2 = io.BytesIO()
+    plt.savefig(img_buffer2, format="png")
+    plt.close()
+    img_buffer2.seek(0)
+
+    with open("monthly_chart.png", "wb") as f:
+        f.write(img_buffer2.read())
+
+    pdf.image("monthly_chart.png", x=10, y=30, w=180)
 
     return pdf.output(dest="S").encode("latin-1")
 # --- TAB 3: COORDINATOR ---
@@ -555,6 +654,7 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
+
 
 
 
