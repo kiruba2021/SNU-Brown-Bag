@@ -98,31 +98,45 @@ def get_plots(df):
 
 
 def generate_pdf_report(df):
-    pdf = FPDF()
-    pdf.add_page()
-    pdf.set_text_color(0, 51, 102)
-    pdf.set_font("Arial", "B", 20)
-    pdf.cell(200, 20, txt="SNU Brown Bag Research Analytics Report", ln=True, align="C")
-
-    fig1, fig2 = get_plots(df)
-
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle
+    from reportlab.lib import colors
+    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib import pagesizes
+    from reportlab.lib.units import inch
     import io
 
-    img_bytes1 = fig1.to_image(format="png")
-    img_bytes2 = fig2.to_image(format="png")
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=pagesizes.A4)
+    elements = []
 
-    with open("plot_dept.png", "wb") as f:
-        f.write(img_bytes1)
+    styles = getSampleStyleSheet()
 
-    with open("plot_role.png", "wb") as f:
-        f.write(img_bytes2)
-    pdf.image("plot_dept.png", x=10, y=40, w=180)
-    pdf.image("plot_role.png", x=50, y=150, w=110)
+    # Title
+    elements.append(Paragraph("<b>SNU Brown Bag Research Report</b>", styles["Title"]))
+    elements.append(Spacer(1, 0.5 * inch))
 
-    os.remove("plot_dept.png")
-    os.remove("plot_role.png")
+    # Summary Table
+    dept_counts = df["Dept"].value_counts().reset_index()
+    dept_counts.columns = ["Department", "Presentations"]
 
-    return pdf.output(dest="S").encode("latin-1")
+    data = [dept_counts.columns.tolist()] + dept_counts.values.tolist()
+
+    table = Table(data)
+    table.setStyle(
+        TableStyle([
+            ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
+            ('GRID', (0,0), (-1,-1), 1, colors.grey),
+            ('ALIGN', (1,1), (-1,-1), 'CENTER')
+        ])
+    )
+
+    elements.append(table)
+
+    doc.build(elements)
+    pdf = buffer.getvalue()
+    buffer.close()
+
+    return pdf
 
 # --- 4. APP INTERFACE ---
 
@@ -696,6 +710,7 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
+
 
 
 
