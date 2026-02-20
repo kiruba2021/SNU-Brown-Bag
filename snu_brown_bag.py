@@ -562,8 +562,6 @@ st.download_button(
     file_name="VC_Dashboard.png",
     mime="image/png"
 )
-        
-        os.remove(dashboard_image)
 
     else:
         st.warning("No data available for analytics.")
@@ -998,6 +996,7 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
+
 
 
 
