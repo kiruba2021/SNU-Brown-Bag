@@ -99,16 +99,14 @@ def get_plots(df):
 
 def generate_pdf_report(df):
     import io
-    import numpy as np
     import pandas as pd
     import plotly.express as px
-    import plotly.graph_objects as go
     from reportlab.platypus import (
         SimpleDocTemplate, Paragraph, Spacer,
-        Table, TableStyle, Image, PageBreak
+        Table, TableStyle, Image
     )
     from reportlab.lib import colors
-    from reportlab.lib.styles import getSampleStyleSheet
+    from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
     from reportlab.lib import pagesizes
     from reportlab.lib.units import inch
 
@@ -117,331 +115,171 @@ def generate_pdf_report(df):
     elements = []
     styles = getSampleStyleSheet()
 
-    # ----------------------------
-    # DATA PREPARATION
-    # ----------------------------
+    # -----------------------------
+    # PREP DATA
+    # -----------------------------
     df["date"] = pd.to_datetime(df["date"], errors="coerce")
     df["Year"] = df["date"].dt.year
-    df["Month"] = df["date"].dt.month
-    df["Month-Year"] = df["date"].dt.strftime("%b %Y")
+    df["Month-Year"] = df["date"].dt.strftime("%B %Y")
 
     total_presentations = len(df)
+    total_departments = df["Dept"].nunique()
+    total_roles = df["designation"].nunique()
 
-    # ==========================================================
-    # 1️⃣ YEAR OVER YEAR GROWTH %
-    # ==========================================================
-    yearly_counts = df.groupby("Year").size().reset_index(name="Count")
-    yearly_counts["Growth %"] = yearly_counts["Count"].pct_change() * 100
+    top_dept = df["Dept"].value_counts().idxmax()
+    top_dept_count = df["Dept"].value_counts().max()
 
-    # ==========================================================
-    # 2️⃣ RESEARCH INTENSITY INDEX
-    # Formula: (Department Presentations / Total Presentations)*100
-    # ==========================================================
+    top_role = df["designation"].value_counts().idxmax()
+
+    peak_month = df["Month-Year"].value_counts().idxmax()
+
+    # -----------------------------
+    # TITLE PAGE
+    # -----------------------------
+    elements.append(Paragraph("<b>SNU Brown Bag Research Portal</b>", styles["Title"]))
+    elements.append(Spacer(1, 0.2 * inch))
+    elements.append(Paragraph("<b>Executive Annual Analytics Report</b>", styles["Heading1"]))
+    elements.append(Spacer(1, 0.5 * inch))
+
+    # -----------------------------
+    # EXECUTIVE SUMMARY
+    # -----------------------------
+    elements.append(Paragraph("<b>Executive Summary</b>", styles["Heading2"]))
+    elements.append(Spacer(1, 0.2 * inch))
+
+    summary_text = f"""
+    Total Presentations Conducted: {total_presentations}<br/>
+    Active Departments Participated: {total_departments}<br/>
+    Presenter Roles Represented: {total_roles}<br/><br/>
+
+    Highest Contributing Department: {top_dept} ({top_dept_count} presentations)<br/>
+    Most Active Presenter Category: {top_role}<br/>
+    Peak Activity Month: {peak_month}<br/>
+    """
+
+    elements.append(Paragraph(summary_text, styles["Normal"]))
+    elements.append(Spacer(1, 0.5 * inch))
+
+    # =============================
+    # KPI SECTION
+    # =============================
+    elements.append(Paragraph("<b>Key Performance Indicators</b>", styles["Heading2"]))
+    elements.append(Spacer(1, 0.2 * inch))
+
+    kpi_data = [
+        ["Metric", "Value"],
+        ["Total Presentations", total_presentations],
+        ["Departments Engaged", total_departments],
+        ["Presenter Categories", total_roles],
+        ["Top Department", top_dept],
+        ["Peak Month", peak_month],
+    ]
+
+    kpi_table = Table(kpi_data)
+    kpi_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
+        ('GRID', (0,0), (-1,-1), 1, colors.grey),
+    ]))
+    elements.append(kpi_table)
+    elements.append(Spacer(1, 0.5 * inch))
+
+    # =============================
+    # DEPARTMENT ANALYSIS
+    # =============================
     dept_counts = df["Dept"].value_counts().reset_index()
     dept_counts.columns = ["Department", "Presentations"]
-    dept_counts["Research Intensity %"] = (
-        dept_counts["Presentations"] / total_presentations * 100
-    )
 
-    # ==========================================================
-    # 3️⃣ DEPARTMENT PERFORMANCE RANKING SCORE
-    # Formula: Weighted Score (Presentations + Role Diversity)
-    # ==========================================================
-    role_div = df.groupby("Dept")["designation"].nunique().reset_index()
-    role_div.columns = ["Dept", "Role Diversity"]
+    elements.append(Paragraph("<b>Department-wise Analysis</b>", styles["Heading2"]))
+    elements.append(Spacer(1, 0.2 * inch))
 
-    ranking = pd.merge(
-        dept_counts,
-        role_div,
-        left_on="Department",
-        right_on="Dept"
-    )
-
-    ranking["Performance Score"] = (
-        ranking["Presentations"] * 0.7 +
-        ranking["Role Diversity"] * 0.3
-    )
-
-    ranking = ranking.sort_values("Performance Score", ascending=False)
-
-    # ==========================================================
-    # 4️⃣ ACADEMIC ACTIVITY HEATMAP
-    # ==========================================================
-    heatmap_data = df.pivot_table(
-        index="Month",
-        columns="Year",
-        aggfunc="size",
-        fill_value=0
-    )
-
-    # ==========================================================
-    # COVER PAGE
-    # ==========================================================
-    elements.append(Paragraph("<b>SNU Brown Bag Research Portal</b>", styles["Title"]))
+    dept_table = Table([dept_counts.columns.tolist()] + dept_counts.values.tolist())
+    dept_table.setStyle(TableStyle([
+        ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
+        ('GRID', (0,0), (-1,-1), 1, colors.grey),
+    ]))
+    elements.append(dept_table)
     elements.append(Spacer(1, 0.3 * inch))
-    elements.append(Paragraph("<b>Institutional Research Analytics Report</b>", styles["Heading1"]))
+
+    fig_dept = px.bar(dept_counts, x="Department", y="Presentations",
+                      title="Department-wise Presentation Count")
+    img_bytes = fig_dept.to_image(format="png")
+    elements.append(Image(io.BytesIO(img_bytes), width=5*inch, height=3*inch))
     elements.append(Spacer(1, 0.5 * inch))
 
-    elements.append(Paragraph(
-        "This report provides institutional benchmarking, research growth analysis, "
-        "department performance ranking, and academic activity trends.",
-        styles["Normal"]
-    ))
+    # =============================
+    # ROLE ANALYSIS
+    # =============================
+    role_counts = df["designation"].value_counts().reset_index()
+    role_counts.columns = ["Role", "Count"]
 
-    elements.append(PageBreak())
-
-    # ==========================================================
-    # SECTION 1: YEARLY GROWTH
-    # ==========================================================
-    elements.append(Paragraph("<b>Year-over-Year Growth Analysis</b>", styles["Heading2"]))
+    elements.append(Paragraph("<b>Presenter Role Distribution</b>", styles["Heading2"]))
     elements.append(Spacer(1, 0.2 * inch))
 
-    growth_table = Table([yearly_counts.columns.tolist()] +
-                         yearly_counts.fillna("-").values.tolist())
-    growth_table.setStyle(TableStyle([
+    role_table = Table([role_counts.columns.tolist()] + role_counts.values.tolist())
+    role_table.setStyle(TableStyle([
         ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
         ('GRID', (0,0), (-1,-1), 1, colors.grey),
     ]))
-
-    elements.append(growth_table)
+    elements.append(role_table)
     elements.append(Spacer(1, 0.3 * inch))
 
-    fig_growth = px.bar(yearly_counts, x="Year", y="Count",
-                        title="Annual Presentation Growth")
-    img = fig_growth.to_image(format="png")
-    elements.append(Image(io.BytesIO(img), width=5*inch, height=3*inch))
-
-    elements.append(PageBreak())
-
-    # ==========================================================
-    # SECTION 2: DEPARTMENT INTENSITY & RANKING
-    # ==========================================================
-    elements.append(Paragraph("<b>Department Research Intensity Index</b>", styles["Heading2"]))
-    elements.append(Spacer(1, 0.2 * inch))
-
-    intensity_table = Table([dept_counts.columns.tolist()] +
-                            dept_counts.values.tolist())
-    intensity_table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
-        ('GRID', (0,0), (-1,-1), 1, colors.grey),
-    ]))
-    elements.append(intensity_table)
-    elements.append(Spacer(1, 0.3 * inch))
-
-    fig_intensity = px.bar(dept_counts,
-                           x="Department",
-                           y="Research Intensity %",
-                           title="Research Intensity by Department")
-    img = fig_intensity.to_image(format="png")
-    elements.append(Image(io.BytesIO(img), width=5*inch, height=3*inch))
-
-    elements.append(PageBreak())
-
-    # ==========================================================
-    # SECTION 3: PERFORMANCE RANKING
-    # ==========================================================
-    elements.append(Paragraph("<b>Department Performance Ranking</b>", styles["Heading2"]))
-    elements.append(Spacer(1, 0.2 * inch))
-
-    ranking_table = Table([ranking.columns.tolist()] +
-                          ranking.values.tolist())
-    ranking_table.setStyle(TableStyle([
-        ('BACKGROUND', (0,0), (-1,0), colors.lightgrey),
-        ('GRID', (0,0), (-1,-1), 1, colors.grey),
-    ]))
-    elements.append(ranking_table)
-    elements.append(Spacer(1, 0.3 * inch))
-
-    fig_rank = px.bar(ranking,
-                      x="Department",
-                      y="Performance Score",
-                      title="Department Performance Score")
-    img = fig_rank.to_image(format="png")
-    elements.append(Image(io.BytesIO(img), width=5*inch, height=3*inch))
-
-    elements.append(PageBreak())
-
-    # ==========================================================
-    # SECTION 4: ACADEMIC ACTIVITY HEATMAP
-    # ==========================================================
-    elements.append(Paragraph("<b>Academic Activity Heatmap</b>", styles["Heading2"]))
-    elements.append(Spacer(1, 0.3 * inch))
-
-    fig_heat = go.Figure(data=go.Heatmap(
-        z=heatmap_data.values,
-        x=heatmap_data.columns,
-        y=heatmap_data.index,
-    ))
-
-    fig_heat.update_layout(title="Month vs Year Research Activity")
-
-    img = fig_heat.to_image(format="png")
-    elements.append(Image(io.BytesIO(img), width=5*inch, height=4*inch))
-
+    fig_role = px.pie(role_counts, names="Role", values="Count",
+                      title="Presenter Role Distribution")
+    img_bytes = fig_role.to_image(format="png")
+    elements.append(Image(io.BytesIO(img_bytes), width=4*inch, height=4*inch))
     elements.append(Spacer(1, 0.5 * inch))
 
-    # ==========================================================
-    # BENCHMARK INSIGHTS
-    # ==========================================================
-    elements.append(Paragraph("<b>Institutional Benchmark Insights</b>", styles["Heading2"]))
+    # =============================
+    # MONTHLY TREND
+    # =============================
+    monthly_counts = df["Month-Year"].value_counts().reset_index()
+    monthly_counts.columns = ["Month-Year", "Presentations"]
+
+    elements.append(Paragraph("<b>Monthly Presentation Trend</b>", styles["Heading2"]))
     elements.append(Spacer(1, 0.2 * inch))
 
-    top_dept = ranking.iloc[0]["Department"]
+    fig_month = px.bar(monthly_counts, x="Month-Year", y="Presentations",
+                       title="Month-wise Trend")
+    img_bytes = fig_month.to_image(format="png")
+    elements.append(Image(io.BytesIO(img_bytes), width=5*inch, height=3*inch))
+    elements.append(Spacer(1, 0.5 * inch))
+
+    # =============================
+    # YEAR x DEPARTMENT
+    # =============================
+    year_dept = df.groupby(["Year", "Dept"]).size().reset_index(name="Count")
+
+    elements.append(Paragraph("<b>Year-wise Department Comparison</b>", styles["Heading2"]))
+    elements.append(Spacer(1, 0.2 * inch))
+
+    fig_year = px.bar(year_dept, x="Year", y="Count",
+                      color="Dept", barmode="group",
+                      title="Year-wise Department Trend")
+
+    img_bytes = fig_year.to_image(format="png")
+    elements.append(Image(io.BytesIO(img_bytes), width=5*inch, height=3*inch))
+    elements.append(Spacer(1, 0.5 * inch))
+
+    # =============================
+    # STRATEGIC INSIGHTS
+    # =============================
+    elements.append(Paragraph("<b>Strategic Insights & Recommendations</b>", styles["Heading2"]))
+    elements.append(Spacer(1, 0.2 * inch))
 
     insights = f"""
-    • The institution shows consistent academic engagement across years.<br/>
-    • {top_dept} leads institutional research activity performance.<br/>
-    • Research intensity is distributed across departments with measurable diversity.<br/>
-    • Peak academic activity clusters can guide structured calendar planning.<br/>
+    • {top_dept} demonstrates strong research engagement and leadership.<br/>
+    • Increased participation from underrepresented departments is recommended.<br/>
+    • {peak_month} indicates peak academic research activity cycle.<br/>
+    • Consider structured monthly scheduling to ensure balanced distribution.<br/>
     """
 
     elements.append(Paragraph(insights, styles["Normal"]))
 
-    # ----------------------------------------------------------
+    # -----------------------------
     doc.build(elements)
     pdf = buffer.getvalue()
     buffer.close()
     return pdf
-# --- 4. APP INTERFACE ---
-
-
-st.set_page_config(page_title="SNU | Brown Bag Portal", layout="wide")
-init_db()
-
-TIME_SLOTS = [
-    dt_time(h, m).strftime("%I:%M %p") for h in range(8, 20) for m in (0, 15, 30, 45)
-]
-DURATIONS = ["30 mins", "45 mins", "1 hour", "1.5 hours", "2 hours"]
-
-if "auth" not in st.session_state:
-    st.session_state["auth"] = False
-if "dept" not in st.session_state:
-    st.session_state["dept"] = None
-st.title("🎓 Shiv Nadar University | Brown Bag Portal")
-tabs = st.tabs(
-    ["📅 Public Schedule", "📊 Analytics", "🔐 Coordinator Access", "🛠️ Admin Control"]
-)
-
-conn = sqlite3.connect("ssn_research.db")
-df = pd.read_sql_query(
-    "SELECT p.*, d.name as Dept FROM presentations p JOIN departments d ON p.dept_id = d.id",
-    conn,
-)
-conn.close()
-# 🔹 Columns used across tabs
-
-
-display_cols = [
-    "id",
-    "date",
-    "time",
-    "title",
-    "presenter",
-    "designation",
-    "guide_name",
-    "duration",
-    "venue_hall",
-    "Dept",
-]
-
-# --- TAB 1: PUBLIC SCHEDULE ---
-
-
-with tabs[0]:
-    st.subheader("📅 Public Presentation Schedule")
-
-    conn = sqlite3.connect("ssn_research.db")
-    today = datetime.now().strftime("%Y-%m-%d")
-
-    # 🔹 Upcoming
-
-    upcoming = pd.read_sql_query(
-        """
-        SELECT p.*, d.name as Dept
-        FROM presentations p
-        JOIN departments d ON p.dept_id = d.id
-        WHERE date >= ?
-        ORDER BY date ASC, time ASC
-    """,
-        conn,
-        params=(today,),
-    )
-
-    st.markdown("## 📌 Upcoming Presentations")
-
-    if upcoming.empty:
-        st.info("No upcoming presentations.")
-    else:
-        display_cols = [
-            "date",
-            "time",
-            "Dept",
-            "title",
-            "presenter",
-            "designation",
-            "guide_name",
-            "duration",
-            "venue_hall/Meeting Link",
-        ]
-        safe_cols = [col for col in display_cols if col in upcoming.columns]
-        st.dataframe(
-            upcoming[safe_cols].sort_values(["date", "time"]),
-            use_container_width=True,
-        )
-    # 🔹 Previous
-
-    previous = pd.read_sql_query(
-        """
-        SELECT p.*, d.name as Dept
-        FROM presentations p
-        JOIN departments d ON p.dept_id = d.id
-        WHERE date < ?
-        ORDER BY date DESC, time DESC
-    """,
-        conn,
-        params=(today,),
-    )
-
-    st.markdown("## 📜 Previous Presentations")
-
-    if previous.empty:
-        st.info("No previous presentations.")
-    else:
-        display_cols = [
-            "date",
-            "time",
-            "Dept",
-            "title",
-            "presenter",
-            "designation",
-            "guide_name",
-            "duration",
-            "venue_hall",
-        ]
-        safe_cols = [col for col in display_cols if col in previous.columns]
-        if not safe_cols:
-            st.error("No matching columns found.")
-        else:
-            st.dataframe(
-                previous[safe_cols]
-                .sort_values(["date", "time"], ascending=False),
-                use_container_width=True,
-            )
-    conn.close()
-# --- TAB 2: ANALYTICS ---
-
-
-with tabs[1]:
-    if not df.empty:
-        st.subheader("Presentation Statistics")
-        f1, f2 = get_plots(df)
-        col1, col2 = st.columns(2)
-        with col1:
-            st.plotly_chart(f1, use_container_width=True)
-        with col2:
-            st.plotly_chart(f2, use_container_width=True)
-    else:
-        st.warning("No data available for analytics yet.")
 # --- TAB 3: COORDINATOR ---
 
 
@@ -874,6 +712,7 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
+
 
 
 
