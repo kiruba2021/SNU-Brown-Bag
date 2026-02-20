@@ -3,6 +3,7 @@ import sqlite3
 import pandas as pd
 import smtplib
 import time
+import plotly.io as pio
 import os
 from email.mime.text import MIMEText
 from datetime import datetime, time as dt_time
@@ -379,16 +380,175 @@ with tabs[0]:
 
 
 with tabs[1]:
+
+    st.markdown("## 🎓 VC Executive Research Dashboard")
+    st.caption("Institution-Level Research Monitoring & Performance Insights")
+
     if not df.empty:
-        st.subheader("Presentation Statistics")
-        f1, f2 = get_plots(df)
-        col1, col2 = st.columns(2)
-        with col1:
-            st.plotly_chart(f1, use_container_width=True)
-        with col2:
-            st.plotly_chart(f2, use_container_width=True)
+
+        # =========================
+        # DATA PREPARATION
+        # =========================
+        df["date"] = pd.to_datetime(df["date"])
+        df["Year"] = df["date"].dt.year
+        df["Month"] = df["date"].dt.month_name()
+        df["YearMonth"] = df["date"].dt.to_period("M").astype(str)
+
+        # =========================
+        # INTERACTIVE FILTERS
+        # =========================
+        colf1, colf2 = st.columns(2)
+
+        selected_dept = colf1.multiselect(
+            "Select Department",
+            options=df["Dept"].unique(),
+            default=df["Dept"].unique(),
+        )
+
+        selected_year = colf2.multiselect(
+            "Select Year",
+            options=sorted(df["Year"].unique()),
+            default=sorted(df["Year"].unique()),
+        )
+
+        filtered_df = df[
+            (df["Dept"].isin(selected_dept)) &
+            (df["Year"].isin(selected_year))
+        ]
+
+        if filtered_df.empty:
+            st.warning("No data for selected filters.")
+            st.stop()
+
+        # =========================
+        # KPI SECTION
+        # =========================
+        total_presentations = len(filtered_df)
+        total_departments = filtered_df["Dept"].nunique()
+        total_presenters = filtered_df["presenter"].nunique()
+        intensity_index = round(total_presentations / total_departments, 2)
+
+        yearly_counts = filtered_df.groupby("Year").size()
+        if len(yearly_counts) > 1:
+            yoy_growth = round(yearly_counts.pct_change().iloc[-1] * 100, 2)
+        else:
+            yoy_growth = 0
+
+        c1, c2, c3, c4 = st.columns(4)
+        c1.metric("Total Presentations", total_presentations)
+        c2.metric("Departments Active", total_departments)
+        c3.metric("Research Intensity Index", intensity_index)
+        c4.metric("YoY Growth %", f"{yoy_growth}%")
+
+        st.divider()
+
+        # =========================
+        # MONTHLY TREND
+        # =========================
+        monthly_counts = filtered_df.groupby("YearMonth").size().reset_index(name="Count")
+
+        fig_month = px.line(
+            monthly_counts,
+            x="YearMonth",
+            y="Count",
+            markers=True,
+            title="📈 Monthly Research Trend",
+            color_discrete_sequence=["#003366"],
+        )
+
+        st.plotly_chart(fig_month, use_container_width=True)
+
+        # =========================
+        # DEPARTMENT PERFORMANCE
+        # =========================
+        dept_rank = filtered_df["Dept"].value_counts().reset_index()
+        dept_rank.columns = ["Department", "Presentations"]
+        dept_rank["Rank"] = dept_rank["Presentations"].rank(ascending=False).astype(int)
+        dept_rank["Performance Score"] = round(
+            (dept_rank["Presentations"] / dept_rank["Presentations"].max()) * 100, 2
+        )
+
+        colA, colB = st.columns([2, 1])
+
+        with colA:
+            st.subheader("🏆 Department Ranking")
+            st.dataframe(dept_rank, use_container_width=True)
+
+        with colB:
+            fig_dept = px.bar(
+                dept_rank,
+                x="Department",
+                y="Presentations",
+                title="Department Distribution",
+                color="Department",
+            )
+            st.plotly_chart(fig_dept, use_container_width=True)
+
+        st.divider()
+
+        # =========================
+        # ROLE DISTRIBUTION
+        # =========================
+        role_fig = px.pie(
+            filtered_df,
+            names="designation",
+            title="🎯 Presenter Role Distribution",
+            color_discrete_sequence=px.colors.qualitative.Bold,
+        )
+        st.plotly_chart(role_fig, use_container_width=True)
+
+        # =========================
+        # HEATMAP
+        # =========================
+        st.subheader("🔥 Academic Activity Heatmap")
+
+        heat_df = filtered_df.groupby(["Dept", "Month"]).size().unstack(fill_value=0)
+
+        heat_fig = px.imshow(
+            heat_df,
+            text_auto=True,
+            aspect="auto",
+            color_continuous_scale="Blues",
+            title="Department vs Month Activity",
+        )
+
+        st.plotly_chart(heat_fig, use_container_width=True)
+
+        # =========================
+        # EXPORT ANALYTICS TO EXCEL
+        # =========================
+        st.divider()
+        st.subheader("⬇ Export Options")
+
+        excel_file = "analytics_export.xlsx"
+        filtered_df.to_excel(excel_file, index=False)
+
+        with open(excel_file, "rb") as f:
+            st.download_button(
+                "📊 Download Full Analytics (Excel)",
+                f,
+                file_name="SNU_Analytics.xlsx",
+            )
+
+        os.remove(excel_file)
+
+        # =========================
+        # DOWNLOAD DASHBOARD IMAGE
+        # =========================
+        dashboard_image = "dashboard_snapshot.png"
+        pio.write_image(fig_month, dashboard_image)
+
+        with open(dashboard_image, "rb") as f:
+            st.download_button(
+                "🖼 Download Trend Chart as Image",
+                f,
+                file_name="Research_Trend.png",
+            )
+
+        os.remove(dashboard_image)
+
     else:
-        st.warning("No data available for analytics yet.")
+        st.warning("No data available for analytics.")
 # --- TAB 3: COORDINATOR ---
 
 
@@ -820,6 +980,7 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
+
 
 
 
