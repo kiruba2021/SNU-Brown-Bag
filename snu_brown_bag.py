@@ -150,6 +150,7 @@ df = pd.read_sql_query(
 conn.close()
 # 🔹 Columns used across tabs
 
+
 display_cols = [
     "id",
     "date",
@@ -379,91 +380,87 @@ with tabs[2]:
 
                             delayed_refresh("Presentation Added!")
                 # --- SUB-SECTION: MANAGE ---
-                # --- SUB-SECTION: MANAGE ---
+        elif c_mode == "Manage Presentations":
 
-                elif c_mode == "Manage Presentations":
+            conn = sqlite3.connect("ssn_research.db")
+            dept_name = st.session_state["dept"]
+
+            pres_df = pd.read_sql_query(
+                """
+                SELECT p.*, d.name as Dept 
+                FROM presentations p 
+                JOIN departments d ON p.dept_id = d.id 
+                WHERE d.name = ?
+                """,
+                conn,
+                params=(dept_name,),
+            )
+            conn.close()
+
+            if pres_df.empty:
+                st.info("No presentations found.")
+            else:
+                st.subheader("📋 Department Presentations")
+
+                display_cols = [
+                    "id",
+                    "date",
+                    "time",
+                    "title",
+                    "presenter",
+                    "designation",
+                    "guide_name",
+                    "duration",
+                    "venue_hall",
+                ]
+
+                st.dataframe(
+                    pres_df[display_cols].sort_values(["date", "time"]),
+                    use_container_width=True,
+                )
+
+                st.divider()
+
+                # 🔽 SELECT ROW FOR ACTION
+
+                selected_id = st.selectbox(
+                    "Select Presentation ID to Edit/Delete", pres_df["id"]
+                )
+
+                col1, col2 = st.columns(2)
+
+                # EDIT
+
+                if col1.button("✏️ Edit Selected"):
+                    st.session_state["edit_id"] = selected_id
+                    # DELETE
+                if col2.button("🗑 Delete Selected"):
 
                     conn = sqlite3.connect("ssn_research.db")
-                    dept_name = st.session_state["dept"]
 
-                    pres_df = pd.read_sql_query(
+                    row = pres_df[pres_df["id"] == selected_id].iloc[0]
+
+                    conn.execute(
                         """
-                        SELECT p.*, d.name as Dept 
-                        FROM presentations p 
-                        JOIN departments d ON p.dept_id = d.id 
-                        WHERE d.name = ?
+                        INSERT INTO activity_logs
+                        (action, title, presenter, dept_name, done_by, action_time)
+                        VALUES (?, ?, ?, ?, ?, ?)
                         """,
-                        conn,
-                        params=(dept_name,),
+                        (
+                            "DELETED",
+                            row["title"],
+                            row["presenter"],
+                            row["Dept"],
+                            st.session_state["dept"],
+                            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                        ),
                     )
+
+                    conn.execute("DELETE FROM presentations WHERE id=?", (selected_id,))
+                    conn.commit()
                     conn.close()
 
-                    if pres_df.empty:
-                        st.info("No presentations found.")
-                    else:
-                        st.subheader("📋 Department Presentations")
-                    display_cols = [
-                        "id",
-                        "date",
-                        "time",
-                        "title",
-                        "presenter",
-                        "designation",
-                        "guide_name",
-                        "duration",
-                        "venue_hall",
-                    ]
-
-                    st.dataframe(
-                        pres_df[display_cols].sort_values(["date", "time"]),
-                        use_container_width=True,
-                    )
-
-                    st.divider()
-
-                    # 🔽 SELECT ROW FOR ACTION
-
-                    selected_id = st.selectbox(
-                        "Select Presentation ID to Edit/Delete", pres_df["id"]
-                    )
-
-                    col1, col2 = st.columns(2)
-
-                    # EDIT
-
-                    if col1.button("✏️ Edit Selected"):
-                        st.session_state["edit_id"] = selected_id
-                    # DELETE
-
-                    if col2.button("🗑 Delete Selected"):
-
-                        conn = sqlite3.connect("ssn_research.db")
-
-                        row = pres_df[pres_df["id"] == selected_id].iloc[0]
-
-                        conn.execute(
-                            """
-                            INSERT INTO activity_logs
-                            (action, title, presenter, dept_name, done_by, action_time)
-                            VALUES (?, ?, ?, ?, ?, ?)
-                            """,
-                            (
-                                "DELETED",
-                                row["title"],
-                                row["presenter"],
-                                row["Dept"],
-                                st.session_state["dept"],
-                                datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
-                            ),
-                        )
-
-                        conn.execute(
-                            "DELETE FROM presentations WHERE id=?", (selected_id,)
-                        )
-                        conn.commit()
-                        conn.close()
-
-                        delayed_refresh("Deleted & Logged")
+                    delayed_refresh("Deleted & Logged")
         # --- EDIT FORM LOGIC (OUTSIDE LOOP) ---
 if "edit_id" in st.session_state:
 
