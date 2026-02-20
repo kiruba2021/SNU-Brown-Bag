@@ -73,7 +73,7 @@ def delayed_refresh(message, icon="✅"):
     st.rerun()
 
 
-# --- 3. ANALYTICS & PDF ENGINE ---
+# --- 3. ANALYTICS &  ENGINE ---
 
 
 def get_plots(df):
@@ -110,15 +110,18 @@ def generate_pdf_report(df):
 
     # Image 1 placement
 
-    pdf.image("plot_dept.png", x=10, y=40, w=180)
+    fig1, fig2 = get_plots(df)
 
-    # Descent spacing: Image 2 starts much lower (y=150) to avoid overlap
+    import io
 
-    pdf.image("plot_role.png", x=50, y=150, w=110)
+    img_bytes1 = fig1.to_image(format="png")
+    img_bytes2 = fig2.to_image(format="png")
 
-    os.remove("plot_dept.png")
-    os.remove("plot_role.png")
-    return pdf.output(dest="S").encode("latin-1")
+    with open("plot_dept.png", "wb") as f:
+        f.write(img_bytes1)
+
+    with open("plot_role.png", "wb") as f:
+        f.write(img_bytes2)
 
 
 # --- 4. APP INTERFACE ---
@@ -693,6 +696,7 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
+
 
 
 
