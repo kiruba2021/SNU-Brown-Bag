@@ -3,7 +3,6 @@ pandas
 fpdf2
 plotly
 numpy
-kaleido
 matplotlib
 reportlab
 python-3.10
