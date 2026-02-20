@@ -58,17 +58,13 @@ def send_mail(subject, body, recipients, sender_email, app_password):
     msg["From"] = sender_email
     msg["To"] = ", ".join(recipients)
     try:
-        server = smtplib.SMTP("smtp.gmail.com", 587)
-        server.ehlo()
-        server.starttls()
-        server.ehlo()
-        server.starttls()
+        server = smtplib.SMTP_SSL("smtp.gmail.com", 465)
         server.login(sender_email, app_password)
         server.sendmail(sender_email, recipients, msg.as_string())
         server.quit()
         return True
     except Exception as e:
-        return f"Mail Error: {str(e)}"
+    return f"Mail Error: {str(e)}"
 
 
 def delayed_refresh(message, icon="✅"):
@@ -651,4 +647,5 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
+
 
