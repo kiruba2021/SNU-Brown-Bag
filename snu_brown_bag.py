@@ -771,7 +771,7 @@ with tabs[3]:
                     )
 
                     conn.close()
-                    portal_link = "https://your-streamlit-app-link.streamlit.app"
+                    portal_link = "https://snu-brown-bag-9mdc54huvzfcgenuooan65.streamlit.app/"
 
                     if upcoming_mail.empty:
                         body = f"""
@@ -820,6 +820,7 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
+
 
 
 
