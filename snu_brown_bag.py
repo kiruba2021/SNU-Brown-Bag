@@ -321,22 +321,31 @@ with tabs[0]:
     if upcoming.empty:
         st.info("No upcoming presentations.")
     else:
-        display_cols = [
-            "date",
-            "time",
-            "Dept",
-            "title",
-            "presenter",
-            "designation",
-            "guide_name",
-            "duration",
-            "venue_hall/Meeting Link",
-        ]
-        safe_cols = [col for col in display_cols if col in upcoming.columns]
-        st.dataframe(
-            upcoming[safe_cols].sort_values(["date", "time"]),
-            use_container_width=True,
-        )
+       display_cols = [
+        "date",
+        "time",
+        "Dept",
+        "title",
+        "presenter",
+        "designation",
+        "guide_name",
+        "duration",
+        "venue_hall",   # ✅ actual column name
+    ]
+
+    safe_cols = [col for col in display_cols if col in upcoming.columns]
+
+    df_show = upcoming[safe_cols].sort_values(["date", "time"])
+
+    # ✅ Rename only for UI
+    df_show = df_show.rename(columns={
+    "venue_hall": "Venue / Meeting Link"
+    })
+
+    st.dataframe(
+        df_show,
+        use_container_width=True,
+    )
     # 🔹 Previous
 
     previous = pd.read_sql_query(
@@ -820,6 +829,7 @@ with tabs[3]:
                 st.dataframe(log_df, use_container_width=True)
             else:
                 st.info("No activity yet.")
+
 
 
 
